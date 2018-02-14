@@ -18,7 +18,7 @@
 * some wires and a 3-pin servo female connector for I-Bus.
 * AVR toolchain (avr-gcc, avr-libc, avrdude, make, ...).
 
-## Connection
+## Wiring
 
 Here is how to connect things together:
 
@@ -35,10 +35,10 @@ The firmware is based on two libraries:
 * AVR [BMP085 library](https://davidegironi.blogspot.cz/2012/10/avr-atmega-bmp085-pressure-sensor.html) by Davide Gironi
 * [I2C/TWI master library](http://homepage.hispeed.ch/peterfleury/doxygen/avr-gcc-libraries/group__pfleury__ic2master.html) by Peter Fleury
 
-The I-Bus code is in the main file [ibus-sensor.c]. It provides the following
-sensors:
+The I-Bus code is in the main file [ibus-sensor.c](ibus-sensor.c).
+It provides the following sensors:
 
-* Temperature sensor from BMP 185
+* Temperature sensor from BMP180
 * Altitude relative to the power-on value
 * Absolute altitude (reported as GPS-Altitude sensor)
 * Maximum relative altitude reached since power on
@@ -51,7 +51,7 @@ and the I-Bus communication (on-board Rx LED).
 ## License
 
 This project, as well as its libraries, is licensed under the terms
-of GNU General Public License, version 2 (only). See the file [COPYING].
+of GNU General Public License, version 2 (only). See the file [COPYING](COPYING).
 
 ## Author
 
