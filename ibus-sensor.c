@@ -4,7 +4,13 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+#ifdef SENSOR_BMP085
 #include "bmp085/bmp085.h"
+#endif
+
+#ifdef SENSOR_BMP280
+#include "bmp280/bmp280.h"
+#endif
 
 #define N_IBUS_CHANNELS 6	// How many sensors there will be
 
@@ -255,8 +261,13 @@ static void handle_rx_packet(void)
 }
 
 // Basic command interpreter for controlling port pins
+#ifdef SENSOR_BMP085
 #define ALTITUDE_SHIFT	5
 #define CLIMB_SHIFT 4
+#else	// BMP280 does a running average by itself
+#define ALTITUDE_SHIFT	0
+#define CLIMB_SHIFT	0
+#endif
 
 int main(void)
 {
@@ -264,11 +275,22 @@ int main(void)
 	int32_t max_alt = 0, climb = 0, prev_alt = 0, climb_sum = 0;
 	uint8_t base_alt_measurements = 20, climb_measurements = 0;
 
+#ifdef SENSOR_BMP085
 	bmp085_init();
+#endif
+#ifdef SENSOR_BMP280
+	bmp280_init();
+#endif
 	adc_init();
 	led_init();
 
+#ifdef SENSOR_BMP085
 	alt = ((int32_t)bmp085_getaltitude() * 100) << ALTITUDE_SHIFT;
+#endif
+#ifdef SENSOR_BMP280
+	bmp280_measure();
+	alt = ((int32_t)bmp280_getaltitude() * 100) << ALTITUDE_SHIFT;
+#endif
 	base_alt = alt >> ALTITUDE_SHIFT;
 
 	serial_init();
@@ -283,9 +305,19 @@ int main(void)
 		led1_on();
 
 		// temperature
+#ifdef SENSOR_BMP085
 		sens_val[sens++] = 400 + 10*bmp085_gettemperature();
 
 		alt_measured = bmp085_getaltitude() * 100;
+#endif
+
+#ifdef SENSOR_BMP280
+		bmp280_measure();
+
+		sens_val[sens++] = 400 + bmp280_gettemperature()/10;
+
+		alt_measured = bmp280_getaltitude() * 100;
+#endif
 
 		// absolute altitude running average
 		alt -= alt >> ALTITUDE_SHIFT;

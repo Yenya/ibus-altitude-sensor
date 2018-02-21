@@ -1,10 +1,21 @@
 TARGET = ibus-sensor
 
 SRC =	$(TARGET).c \
-	bmp085/bmp085.c \
 	i2chw/twimaster.c
 
-MCU = atmega32u4        # ProMicro
+# For BMP085/BMP180 sensor uncomment this:
+SRC +=	bmp085/bmp085.c
+SENSOR_DEFS = -DSENSOR_BMP085
+
+# For BMP280 sensor uncomment this:
+# SRC +=	bmp280/bmp280.c
+# SENSOR_DEFS = -DSENSOR_BMP280
+
+# For SparkFun Promicro:
+MCU = atmega32u4
+
+# For Arduino Nano:
+# MCU = atmega328p
 
 # Processor frequency.
 #   Normally the first thing your program should do is set the clock prescaler,
@@ -73,6 +84,7 @@ CPPDEFS = -DF_CPU=$(F_CPU)UL
 #    -adhlns...: create assembler listing
 CFLAGS = -g$(DEBUG)
 CFLAGS += $(CDEFS)
+CFLAGS += $(SENSOR_DEFS)
 CFLAGS += -O$(OPT)
 CFLAGS += -funsigned-char
 CFLAGS += -funsigned-bitfields
