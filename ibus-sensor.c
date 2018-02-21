@@ -331,7 +331,11 @@ int main(void)
 
 		// ext_voltage
 		tmp = read_adc_sync();
-		sens_val[sens++] = adc_to_10mv(tmp);
+		tmp = adc_to_10mv(tmp);
+		if (tmp < 100) { // when unconnected, don't send the noise
+			tmp = 0;
+		}
+		sens_val[sens++] = tmp;
 
 		led1_off();
                 _delay_ms(60);
