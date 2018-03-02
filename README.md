@@ -6,14 +6,15 @@
   modified [firmware from qba667](https://github.com/qba667/FlySkyI6).
 * Receiver with I-Bus sensor input, such as FS-iA6B. No firmware modification
   required.
-* Atmel AVR-based board. I used SparkFun
-  [ProMicro](https://www.sparkfun.com/products/12640) clone,
-  and this is what the firmware expects. It is about the lightest but powerful
-  ATmega-based board.
-* Supported pressure sensor with I2C on a break-out board.
-  I used BMP-180 on a GY-68 board bought at eBay. BMP-280 is also supported,
-  but be sure to use an AVR board with 3.3 V output (such as 3.3V version
-  of ProMicro, or Arduino Nano).
+* Atmel AVR-based board. Tested with SparkFun
+  [ProMicro](https://www.sparkfun.com/products/12640) clone, and
+  [Arduino Nano](https://www.arduino.cc/en/Guide/ArduinoNano) clone.
+  ProMicro is about the lightest but powerful ATmega-based board.
+  Nano is a bit heavier, but it has 3.3V dedicated output, so that
+  it can be directly used with BMP-280 breakout board.
+* Supported pressure sensor with I2C on a break-out board. Currently
+  supported is BMP-180 on a GY-68 board, and BMP-280 break-out board.
+  The later is more precise, but it requires 3.3 V power.
 * 390K and 15K resistors for voltage divider for reading the battery
   voltage (optional).
 * some wires and a 3-pin servo female connector for I-Bus.
@@ -29,6 +30,10 @@ And here is my (rather messy) real-world example in Sky Surfer 1400:
 
 ![Wiring in Sky Surfer 1400](wiring-photo.jpg)
 
+Here is the version with Arduino Nano and BMP-280:
+
+![Nano with BMP280](wiring-nano-bmp280.png)
+
 ## Firmware
 
 The firmware is based on the following libraries:
@@ -40,7 +45,7 @@ The firmware is based on the following libraries:
 The I-Bus code is in the main file [ibus-sensor.c](ibus-sensor.c).
 It provides the following sensors:
 
-* Temperature sensor from BMP180
+* Temperature sensor from BMPxxx
 * Altitude relative to the power-on value
 * Absolute altitude (reported as GPS-Altitude sensor)
 * Maximum relative altitude reached since power on
