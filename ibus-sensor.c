@@ -13,6 +13,7 @@
 #endif
 
 #define N_IBUS_CHANNELS 6	// How many sensors there will be
+#define MAIN_LOOP_MS	50	// Used for RoC -> m/s conversion
 
 volatile uint8_t sens_addr[N_IBUS_CHANNELS]; // sensor addresses
 
@@ -367,10 +368,10 @@ static void handle_rx_packet(void)
 // Basic command interpreter for controlling port pins
 #ifdef SENSOR_BMP085
 #define ALTITUDE_SHIFT	5
-#define CLIMB_SHIFT 4
+#define CLIMB_SHIFT	5
 #else	// BMP280 does a running average by itself
 #define ALTITUDE_SHIFT	0
-#define CLIMB_SHIFT	0
+#define CLIMB_SHIFT	3
 #endif
 #define VOLTAGE_SHIFT	5 // 10-bit ADC, so it has to be 6 or less
 
@@ -458,12 +459,21 @@ int main(void)
 		// maximum altitude
 		sens_val[sens++] = max_alt;
 
+		/*
+		 * RoC: we do not want to calculate it every time,
+		 * because it is very imprecise. So we average the
+		 * altitude (1 << CLIMB_SHIFT) times, and then compute
+		 * the climb rate based of this.
+		 *
+		 * This is not very precise, it is better to use the raw
+		 * altitude in Tx instead.
+		 */
 		climb_sum += alt_measured;
 
 		if (++climb_measurements >= (1 << CLIMB_SHIFT)) {
 			climb_measurements = 0;
 			climb_sum >>= CLIMB_SHIFT;
-			climb = (climb_sum - prev_alt)*16/(1 << CLIMB_SHIFT);
+			climb = (climb_sum - prev_alt)*1000/MAIN_LOOP_MS;
 			prev_alt = climb_sum;
 			climb_sum = 0;
 		}
@@ -481,7 +491,7 @@ int main(void)
 		sens_val[sens++] = tmp;
 
 		led1_off();
-                _delay_ms(60);
+                _delay_ms(MAIN_LOOP_MS);
 	}
 }
 
