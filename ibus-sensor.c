@@ -43,6 +43,27 @@ volatile uint32_t sens_val[N_IBUS_CHANNELS];
 static void handle_rx_packet(void);
 
 /* ------------ on-board LEDs ------------- */
+#ifdef __AVR_ATmega328P__
+static void led_init(void)
+{
+	DDRB |= _BV(PB5); // Rx LED
+}
+
+static void led1_on(void)
+{
+	PORTB |= _BV(PB5);
+}
+
+static void led1_off(void)
+{
+	PORTB &= ~_BV(PB5);
+}
+
+static void led2_on(void) { }
+static void led2_off(void) { }
+#endif
+
+#ifdef __AVR_ATmega32U4__
 static void led_init(void)
 {
 	DDRB |= _BV(PB0); // Rx LED
@@ -68,6 +89,7 @@ static void led2_off(void)
 {
 	PORTD |= _BV(PD5);
 }
+#endif
 
 /* ----------------- USART ----------------- */
 
@@ -79,43 +101,110 @@ static void led2_off(void)
 static volatile uint8_t buffer[BUFLEN];
 static volatile uint8_t buf_offset;
 
+#ifdef __AVR_ATmega328P__
+static void serial_init(void)
+{
+	UBRR0 = UBRR_VAL;
+
+	UCSR0A = 0;
+	UCSR0B = _BV(RXEN0) | _BV(RXCIE0) | _BV(UDRIE0);
+        UCSR0C = _BV(UCSZ01)|_BV(UCSZ00);
+}
+
+static void serial_enable_rx(void)
+{
+	UCSR0B &= ~(_BV(TXEN0) | _BV(TXCIE0));
+	UCSR0B |= _BV(RXEN0) | _BV(RXCIE0);
+}
+
+static void serial_enable_tx(void)
+{
+	UCSR0B &= ~_BV(RXEN0);
+	UCSR0B |= _BV(TXEN0) | _BV(UDRIE0);
+}
+
+static void serial_notify_tx_end(void)
+{
+	UCSR0B &= ~_BV(UDRIE0);
+	UCSR0B |= _BV(TXCIE0);
+}
+
+#define serial_rx_vect USART_RX_vect
+#define serial_tx_vect USART_TX_vect
+#define serial_udre_vect USART_UDRE_vect
+
+#define serial_data UDR0
+
+#endif
+
+#ifdef __AVR_ATmega32U4__
 static void serial_init(void)
 {
 	UBRR1 = UBRR_VAL;
 
 	UCSR1A = 0;
-	// UCSR0B = _BV(RXCIE1)|_BV(RXEN1)|_BV(TXEN1);
 	UCSR1B = _BV(RXEN1) | _BV(RXCIE1) | _BV(UDRIE1);
         UCSR1C = _BV(UCSZ11)|_BV(UCSZ10);
 }
 
+static void serial_enable_rx(void)
+{
+	UCSR1B &= ~(_BV(TXEN1) | _BV(TXCIE1));
+	UCSR1B |= _BV(RXEN1) | _BV(RXCIE1);
+}
+
+static void serial_enable_tx(void)
+{
+	UCSR1B &= ~_BV(RXEN1);
+	UCSR1B |= _BV(TXEN1) | _BV(UDRIE1);
+}
+
+static void serial_notify_tx_end(void)
+{
+	UCSR1B &= ~_BV(UDRIE1);
+	UCSR1B |= _BV(TXCIE1);
+}
+
+#define serial_rx_vect USART1_RX_vect
+#define serial_tx_vect USART1_TX_vect
+#define serial_udre_vect USART1_UDRE_vect
+
+#define serial_data UDR1
+
+#endif
+
 static void recv_restart(void)
 {
-	led2_off();
+	// led2_on();
 
 	buf_offset = 0;
-	UCSR1B &= ~_BV(TXEN1);
-	UCSR1B |= _BV(RXEN1) | _BV(RXCIE1);
+	serial_enable_rx();
 }
 
 static void tx_start(void)
 {
 	buf_offset = 0;
-
-	UCSR1B &= ~_BV(RXEN1);
-	UCSR1B |= _BV(TXEN1) | _BV(UDRIE1);
+	serial_enable_tx();
 }
 
 // USART receive interrupt
-ISR(USART1_RX_vect)
+ISR(serial_rx_vect)
 {
-	uint8_t val = UDR1;
+	uint8_t val = serial_data;
+	static uint8_t ledstate;
 
 	// a shorthand - for now, we accept 4-byte packets only
 	if (buf_offset == 0 && val != 4)
 		return;
 	
 	buffer[buf_offset++] = val;
+		if (ledstate) {
+			led2_on();
+			ledstate = 0;
+		} else {
+			led2_off();
+			ledstate = 1;
+		}
 
 	if (buf_offset == buffer[0]) {
 		handle_rx_packet();
@@ -124,25 +213,39 @@ ISR(USART1_RX_vect)
 }
 
 // Next Tx byte wanted
-ISR(USART1_UDRE_vect)
+ISR(serial_udre_vect)
 {
 	if (buf_offset < buffer[0])
-		UDR1 = buffer[buf_offset++];
+		serial_data = buffer[buf_offset++];
 
-	if (buf_offset >= buffer[0]) { // finished
-		UCSR1B &= ~_BV(UDRIE1);
-		UCSR1B |= _BV(TXCIE1);
-	}
+	if (buf_offset >= buffer[0]) // finished
+		serial_notify_tx_end();
 }
 
 // Tx finished
-ISR(USART1_TX_vect)
+ISR(serial_tx_vect)
 {
-	UCSR1B &= ~_BV(TXCIE1);
 	recv_restart();
 }
 
 /* ---- A/D converter for battery voltage ---- */
+
+#define EXT_V_DIVIDER	((390.0+15)/15)	// 390k and 15k resistors
+
+#ifdef __AVR_ATmega328P__
+static void adc_init(void)
+{
+	ADCSRA = _BV(ADEN)   // enable ADC
+		| _BV(ADPS0) | _BV(ADPS1) | _BV(ADPS2); // CLK/128 = 125 kHz
+	ADMUX = _BV(REFS1) | _BV(REFS0) // internal 1.1V reference
+		| _BV(MUX2) | _BV(MUX1) | _BV(MUX0); // ADC7
+}
+
+#define adc_to_10mv(x) ((x) * EXT_V_DIVIDER * 0.1074)
+
+#endif
+
+#ifdef __AVR_ATmega32U4__
 static void adc_init(void)
 {
 	DIDR0 |= _BV(ADC4D); // disable digital input on ADC4
@@ -151,6 +254,10 @@ static void adc_init(void)
 	ADMUX = _BV(REFS1) | _BV(REFS0) // internal 2.56V reference
 		| _BV(MUX2); // ADC4 on pin PF4
 }
+
+#define adc_to_10mv(x) ((x) * EXT_V_DIVIDER * 0.25)
+
+#endif
 
 // TODO: use the ADC interrupt instead
 static uint16_t read_adc_sync(void)
@@ -169,9 +276,6 @@ static uint16_t read_adc_sync(void)
 	return retval;
 }
 
-#define EXT_V_DIVIDER	((390+15)/15)	// 390k and 15k resistors
-#define adc_to_10mv(x) ((x) * EXT_V_DIVIDER * 0.25)
-
 /* ----------------- iBus ------------------ */
 static void ibus_init(void)
 {
@@ -188,7 +292,7 @@ static void send_buffer(void)
 	uint8_t i;
 	uint16_t csum = 0xFFFF;
 
-	led2_on(); // off after the frame is sent
+	// led2_on(); // off after the frame is sent
 
 	// compute the I-Bus checksum
 	for (i = 0; i < buffer[0] - 2; i++)
@@ -268,21 +372,25 @@ static void handle_rx_packet(void)
 #define ALTITUDE_SHIFT	0
 #define CLIMB_SHIFT	0
 #endif
+#define VOLTAGE_SHIFT	5 // 10-bit ADC, so it has to be 6 or less
 
 int main(void)
 {
 	int32_t alt, base_alt, alt_measured;
 	int32_t max_alt = 0, climb = 0, prev_alt = 0, climb_sum = 0;
 	uint8_t base_alt_measurements = 20, climb_measurements = 0;
+	uint16_t voltage_raw;
 
 #ifdef SENSOR_BMP085
 	bmp085_init();
 #endif
 #ifdef SENSOR_BMP280
 	bmp280_init();
+	bmp280_set_config(0, 3, 0); // 0.5 ms delay, 8x filter, no 3-wire SPI
 #endif
 	adc_init();
 	led_init();
+	led1_off();
 
 #ifdef SENSOR_BMP085
 	alt = ((int32_t)bmp085_getaltitude() * 100) << ALTITUDE_SHIFT;
@@ -292,6 +400,8 @@ int main(void)
 	alt = ((int32_t)bmp280_getaltitude() * 100) << ALTITUDE_SHIFT;
 #endif
 	base_alt = alt >> ALTITUDE_SHIFT;
+
+	voltage_raw = read_adc_sync() << VOLTAGE_SHIFT;
 
 	serial_init();
 	ibus_init();
@@ -362,8 +472,9 @@ int main(void)
 		sens_val[sens++] = climb;
 
 		// ext_voltage
-		tmp = read_adc_sync();
-		tmp = adc_to_10mv(tmp);
+		voltage_raw -= voltage_raw >> VOLTAGE_SHIFT;
+		voltage_raw += read_adc_sync();
+		tmp = adc_to_10mv(voltage_raw >> VOLTAGE_SHIFT);
 		if (tmp < 100) { // when unconnected, don't send the noise
 			tmp = 0;
 		}

@@ -107,7 +107,7 @@ static union _bmp280_cal_union {
 		int16_t  dig_p7;
 		int16_t  dig_p8;
 		int16_t  dig_p9;
-	}
+	};
 } bmp280_cal;
 
 /*

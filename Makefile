@@ -1,7 +1,4 @@
-TARGET = ibus-sensor
-
-SRC =	$(TARGET).c \
-	i2chw/twimaster.c
+#### Configure the AVR board and pressure sensor you use:
 
 # For BMP085/BMP180 sensor uncomment this:
 SRC +=	bmp085/bmp085.c
@@ -11,11 +8,23 @@ SENSOR_DEFS = -DSENSOR_BMP085
 # SRC +=	bmp280/bmp280.c
 # SENSOR_DEFS = -DSENSOR_BMP280
 
-# For SparkFun Promicro:
+# For SparkFun Promicro uncomment this:
 MCU = atmega32u4
+AVRDUDE_PROGRAMMER = avr109
+AVRDUDE_PORT = /dev/ttyACM0
 
-# For Arduino Nano:
+# For Arduino Nano uncomment this:
 # MCU = atmega328p
+# AVRDUDE_PROGRAMMER = arduino
+# AVRDUDE_FLAGS +=  -b 57600
+# AVRDUDE_PORT = /dev/ttyUSB0
+
+#### END of user configuration ###############################################
+
+TARGET = ibus-sensor
+
+SRC +=	$(TARGET).c \
+	i2chw/twimaster.c
 
 # Processor frequency.
 #   Normally the first thing your program should do is set the clock prescaler,
@@ -212,10 +221,7 @@ LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
 # Type: avrdude -c ?
 # to get a full listing.
 #
-AVRDUDE_PROGRAMMER = avr109
 
-# com1 = serial port. Use lpt1 to connect to parallel port.
-AVRDUDE_PORT = /dev/ttyACM0    # programmer connected to serial device
 
 AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 #AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep
@@ -235,7 +241,7 @@ AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 # to submit bug reports.
 #AVRDUDE_VERBOSE = -v -v
 
-AVRDUDE_FLAGS = -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER)
+AVRDUDE_FLAGS += -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER)
 AVRDUDE_FLAGS += $(AVRDUDE_NO_VERIFY)
 AVRDUDE_FLAGS += $(AVRDUDE_VERBOSE)
 AVRDUDE_FLAGS += $(AVRDUDE_ERASE_COUNTER)
@@ -320,7 +326,7 @@ LST = $(SRC:%.c=$(OBJDIR)/%.lst) $(CPPSRC:%.cpp=$(OBJDIR)/%.lst) $(ASRC:%.S=$(OB
 
 
 # Compiler flags to generate dependency files.
-GENDEPFLAGS = -MMD -MP -MF .dep/$(@F).d
+# GENDEPFLAGS = -MMD -MP -MF .dep/$(@F).d
 
 
 # Combine all necessary flags and optional flags.
@@ -548,7 +554,7 @@ $(shell mkdir $(OBJDIR) 2>/dev/null)
 
 
 # Include the dependency files.
--include $(shell mkdir .dep 2>/dev/null) $(wildcard .dep/*)
+# -include $(shell mkdir .dep 2>/dev/null) $(wildcard .dep/*)
 
 
 # Listing of phony targets.
